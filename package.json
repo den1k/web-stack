@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "shadow-cljs": "^2.2.21"
+  },
+  "dependencies": {
+    "create-react-class": "^15.6.3",
+    "react": "^16.3.0",
+    "react-dom": "^16.3.0",
+    "semantic-ui-react": "^0.79.0"
+  }
+}
