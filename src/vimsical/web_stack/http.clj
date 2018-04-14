@@ -19,8 +19,6 @@
   (web/stop server))
 
 (declare http-component)
-(defstate
- http-component
+(defstate http-component
   :start (start-http config-component router/router-component)
   :stop (stop-http http-component))
-

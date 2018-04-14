@@ -4,41 +4,39 @@
             [shadow.cljs.devtools.server :as shadow-server]
             [medley.core :as md]
             [mount.core :as mount :refer [defstate]]
-            [vimsical.web-stack.util :as util]
-            [vimsical.web-stack.http :as http]
             [vimsical.web-stack.config :as config]
             [hiccup.page :as html :refer [html5]]
             [clojure.string :as string]
             [camel-snake-kebab.core :as csk]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [vimsical.web-stack.router :as router]))
 
 (def default-config
   {::config      {:scripts ["/js/main.js"]}
 
    ::shadow-cljs {:lein
-                        true
-                        :builds
-                        {:app
-                         {:target     :browser
-                          :output-dir "resources/public/js"
-                          :asset-path "/js"
-                          :nrepl      {:port 9000}
-                          :devtools
-                          ;; before live-reloading any code call this function
-                                      {
-                                       ;:before-load starter.browser/stop
+                  true
+                  :builds
+                  {:app
+                   {:target     :browser
+                    :output-dir "resources/public/js"
+                    :asset-path "/js"
+                    :nrepl      {:port 9000}
+                    :devtools
+                    ;; before live-reloading any code call this function
+                                {
+                                 ;:before-load starter.browser/stop
 
-                                       ;; after live-reloading finishes call this function
-                                       ;:after-load dashboard.core/mount
+                                 ;; after live-reloading finishes call this function
+                                 ;:after-load dashboard.core/mount
 
-                                       ; serve the public directory over http at port 8020
-                                       :http-root    "resources/public"
-                                       ;; todo FIXME
-                                       :http-port    8020
-                                       ;; avoid circular dep
-                                       :http-handler 'vimsical.web-stack.router/router-component
-                                       ;:module-hash-names true
-                                       :preloads     ['devtools.preload]}}}}})
+                                 ; serve the public directory over http at port 8020
+                                 :http-root    "resources/public"
+                                 ;; todo FIXME use top ::http/port from config
+                                 :http-port    8020
+                                 :http-handler `router/router-component
+                                 ;:module-hash-names true
+                                 :preloads     ['devtools.preload]}}}}})
 
 (defn index-html-string
   [{:as   static-config
@@ -61,8 +59,6 @@
               (when err (println "Errors:") (println err))
               (when out (println "Out:") (println out)))]
       (print-fn
-       (clojure.java.shell/sh "npm" "install" "--save-dev" "shadow-cljs"))
-      (print-fn
        (clojure.java.shell/sh
         "npm" "install"
         "react" "react-dom" "create-react-class" "semantic-ui-react")))))
@@ -74,9 +70,6 @@
   (spit "resources/public/index.html"
         (index-html-string config)))
 
-(declare static-resources)
-(defstate static-resources
-  :start (start-static-resources config/config-component))
 
 (defn with-shadow-config-fn [edn body]
   (with-redefs [shc/load-cljs-edn (constantly edn)]
@@ -101,11 +94,13 @@
 
 ;; todo use target from config (`:app`)
 (defn release [config]
+  (start-static-resources config)
   (with-shadow-config
    (shadow-config config)
    (shadow-api/release :app)))
 
 (defn watch [config]
+  (start-static-resources config)
   (with-shadow-config
    (shadow-config config)
    (shadow-server/start!)

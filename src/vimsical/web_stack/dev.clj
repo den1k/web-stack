@@ -1,50 +1,74 @@
 (ns vimsical.web-stack.dev
   (:require [mount.core :as mount]
-            [vimsical.web-stack.http :as http]
-            [vimsical.web-stack.config :as config]
-            ;[vimsical.web-stack.db :as db] ;; add because overwriting http
-            [vimsical.web-stack.build :as build]
-
             [vimsical.web-stack.util :as util]))
+
+(defn loaded-namespaces [user-config]
+  (into #{} (comp (map namespace) (map symbol)) (keys user-config)))
 
 (defn default-config
   "Fetches default configs from namespaces of user-provided qualified keys.
   Merges into one config."
   [user-config]
-  (let [user-ns (into #{} (comp (map namespace) (map symbol)) (keys user-config))]
-    (apply require user-ns)
+  (let [loaded-ns' (loaded-namespaces user-config)]
+    (apply require loaded-ns')
     ;; merge default configs
     (into {}
           (comp (keep (fn [ns] (resolve (symbol (str ns "/" 'default-config)))))
                 (map var-get))
-          user-ns)))
+          loaded-ns')))
+
+(defn filter-vars-from-loaded-namespaces [config symbol-seq]
+  (let [loaded-ns' (loaded-namespaces config)]
+    (into #{}
+          (comp (filter #(contains? loaded-ns' (symbol (namespace %))))
+                (map symbol)
+                (map find-var))
+          symbol-seq)))
 
 (defn make-config [user-config]
   (util/deep-merge2 (default-config user-config) user-config))
 
-(defn start-dev [user-config]
-  (let [config (make-config user-config)]
-    (mount/start-with {#'config/config-component config
-                       #'http/http-component     {}})))
+(defn mount-start-map [user-config stub-component-vars]
+  (let [config        (make-config user-config)
+        filtered-vars (filter-vars-from-loaded-namespaces user-config stub-component-vars)
+        m             (into {#'vimsical.web-stack.config/config-component config}
+                            ; stub var keys have nil values
+                            (map #(vector % nil))
+                            filtered-vars)]
+    m))
 
-(def stop-dev mount/stop)
+(defn start-map [user-config]
+  (mount-start-map user-config []))
 
-(defn reset-dev [config-or-update-fn]
-  (stop-dev)
-  (start-dev config-or-update-fn))
+(defn start [user-config]
+  (mount/start-with (mount-start-map user-config [])))
 
-(defn make-release [config-or-update-fn]
-  (let [config (make-config config-or-update-fn)]
-    (mount/start-with {#'config/config-component config
-                       #'http/http-component     nil
-                       #'build/watch-component   nil})
-    (build/release config)))
+(def stop mount/stop)
+
+(defn reset [user-config]
+  (stop)
+  (start user-config))
+
+(defn start-all [user-config]
+  (mount/start-with (mount-start-map user-config
+                                ['vimsical.web-stack.http/http-component])))
+
+(def stop-all mount/stop)
+
+(defn reset-all [config]
+  (stop-all)
+  (start-all config))
+
+(defn reset-backend [user-config]
+  (apply mount/stop-except
+         (filter-vars-from-loaded-namespaces
+          user-config ['vimsical.web-stack.build/watch-component]))
+  (start-all user-config))
+
 
 ;(comment
 ; (def user-config
-;   {::db/name           "test-db"
-;
-;    ::build/config      {:app-init-fn 'vimsical.web-stack.abc/init
+;   {::build/config      {:app-init-fn 'vimsical.web-stack.abc/init
 ;                         :stylesheets ["//cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.12/semantic.min.css"]}
 ;    ::build/shadow-cljs {:lein   true
 ;                         :builds {:app
@@ -58,9 +82,9 @@
 ;    ::router/routes     {}
 ;    })
 
- ;(start-dev user-config)
- ;(stop-dev)
- ;(reset-dev user-config))
+;(start-dev user-config)
+;(stop-dev)
+;(reset-dev user-config))
 
 ;(make-release config)
 

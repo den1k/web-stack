@@ -29,7 +29,7 @@
                  [hiccup "1.0.5"]
 
                  ;; Frontend
-                 [thheller/shadow-cljs "2.2.23"
+                 [thheller/shadow-cljs "2.2.29"
                   ;:exclusions [com.fasterxml.jackson.core/jackson-core
                   ;             org.clojure/spec.alpha]
                   ]

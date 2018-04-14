@@ -1,7 +1,5 @@
 (ns vimsical.web-stack.router
   (:require [vimsical.web-stack.config :as config]
-            [vimsical.web-stack.db :as db]
-            [datomic.client.api :as d]
             [mount.core :refer [defstate]]
             [ring.util.response :as res]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
@@ -19,10 +17,6 @@
                               (res/response "dispatchhhhh"))
 
                 ;true        (fn [_] (res/redirect "/"))
-                "/q"        (fn q-handler [req]
-                              (let [q      (-> req :body slurp clojure.edn/read-string)
-                                    result (d/q q (d/db db/db-conn))]
-                                (res/response (pr-str result))))
                 }
    :middleware [[wrap-defaults api-defaults]
                 wrap-params]})
@@ -53,7 +47,7 @@
   [entries]
   (apply comp (map middleware-fn (reverse entries))))
 
-(defn start-router [{::keys [routes middleware]} _]
+(defn start-router [{::keys [routes middleware]}]
   (let [middleware (compose-middleware middleware)]
     (-> routes
         wrap-routes
@@ -62,4 +56,4 @@
 
 (declare router-component)
 (defstate router-component
-  :start (start-router config/config-component db/db-conn))
+  :start (start-router config/config-component))
